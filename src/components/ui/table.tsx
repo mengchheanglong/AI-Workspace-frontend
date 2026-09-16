@@ -1,0 +1,1 @@
+import React from 'react'; export const Table = ({ children }: any) => <table className="table">{children}</table>;

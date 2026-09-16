@@ -1,0 +1,1 @@
+import React from 'react'; export const Textarea = (props: any) => <textarea className="textarea" {...props} />;

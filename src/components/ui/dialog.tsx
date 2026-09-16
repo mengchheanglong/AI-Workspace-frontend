@@ -1,0 +1,1 @@
+import React from 'react'; export const Dialog = ({ children }: any) => <div className="dialog">{children}</div>;
