@@ -26,13 +26,15 @@ import {
   ArrowRight,
   Sparkles,
   HelpCircle,
-  FolderOpen
+  FolderOpen,
+  Database,
 } from "lucide-react";
 
 export default function DashboardPage() {
   const { currentProject, user } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [activity, setActivity] = useState<any[]>([]);
+  const [sources, setSources] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showGuide, setShowGuide] = useState(true);
 
@@ -41,12 +43,14 @@ export default function DashboardPage() {
       if (!currentProject) return;
       setLoading(true);
       try {
-        const [dashData, actEnvelope] = await Promise.all([
+        const [dashData, actEnvelope, sourcesData] = await Promise.all([
           api.dashboard.get(currentProject.id),
           api.dashboard.getActivity(currentProject.id, 1, 15),
+          api.ingestion.listSources(currentProject.id).catch(() => []),
         ]);
         setStats(dashData);
         setActivity(actEnvelope?.data || dashData?.recentActivity || []);
+        setSources(sourcesData || []);
       } catch (err) {
         console.error("Dashboard load failed:", err);
       } finally {
@@ -476,6 +480,75 @@ export default function DashboardPage() {
           </Card>
 
         </div>
+
+        {/* Semantic Knowledge Base & Vector Index (Phase 2) */}
+        <Card className="bg-[#121318] border-white/[0.08]">
+          <CardHeader className="pb-3 border-b border-white/[0.06] flex flex-row items-center justify-between">
+            <CardTitle className="text-xs font-semibold text-zinc-200 flex items-center gap-2">
+              <Database className="w-4 h-4 text-emerald-400" />
+              <span>Semantic Knowledge Base & Vector Pipeline</span>
+            </CardTitle>
+            <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px] font-normal">
+              1536-dim pgvector
+            </Badge>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {loading ? (
+              <Skeleton className="h-16 w-full bg-white/5" />
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">Indexed Sources</div>
+                    <div className="text-xl font-bold text-white mt-1">
+                      {sources.filter((s) => s.status === "INDEXED").length}
+                    </div>
+                    <div className="text-[10px] text-zinc-500 mt-0.5">
+                      of {sources.length} registered
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">Total Chunks</div>
+                    <div className="text-xl font-bold text-emerald-400 mt-1">
+                      {sources.reduce((acc, s) => acc + (s.chunkCount || 0), 0)}
+                    </div>
+                    <div className="text-[10px] text-zinc-500 mt-0.5">
+                      ~600 tokens/chunk
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">Documents</div>
+                    <div className="text-xl font-bold text-amber-400 mt-1">
+                      {sources.filter((s) => s.sourceType === "DOCUMENT").length}
+                    </div>
+                    <div className="text-[10px] text-zinc-500 mt-0.5">
+                      PDF, DOCX, MD, TXT
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                    <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">Workspace Entities</div>
+                    <div className="text-xl font-bold text-indigo-400 mt-1">
+                      {sources.filter((s) => s.sourceType !== "DOCUMENT").length}
+                    </div>
+                    <div className="text-[10px] text-zinc-500 mt-0.5">
+                      Reqs, Decisions, Tasks
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-1">
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                    Automated background outbox synchronization enabled
+                  </span>
+                  <Link href="/documents" className="text-indigo-400 hover:underline">
+                    Manage Documents →
+                  </Link>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Live Recent Activity */}
         <Card className="bg-[#121318] border-white/[0.08]">

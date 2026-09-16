@@ -21,7 +21,8 @@ import {
   FileCode,
   HardDrive,
   Loader2,
-  Sparkles
+  Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
@@ -31,9 +32,11 @@ export default function DocumentsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [docs, setDocs] = useState<any[]>([]);
+  const [sources, setSources] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [reindexingId, setReindexingId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [dragOver, setDragOver] = useState(false);
@@ -42,8 +45,12 @@ export default function DocumentsPage() {
     if (!currentProject) return;
     setLoading(true);
     try {
-      const data = await api.documents.list(currentProject.id);
-      setDocs(data || []);
+      const [docsData, sourcesData] = await Promise.all([
+        api.documents.list(currentProject.id),
+        api.ingestion.listSources(currentProject.id, { sourceType: "DOCUMENT" }).catch(() => []),
+      ]);
+      setDocs(docsData || []);
+      setSources(sourcesData || []);
     } catch (err: any) {
       console.error(err);
       showToast(err.message || "Failed to load documents", "error");
@@ -128,6 +135,67 @@ export default function DocumentsPage() {
       return <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30 font-mono text-[10px]">MARKDOWN</Badge>;
     }
     return <Badge variant="secondary" className="font-mono text-[10px]">TEXT</Badge>;
+  };
+
+  const sourceMap = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const s of sources) {
+      if (s.sourceId) map.set(s.sourceId, s);
+    }
+    return map;
+  }, [sources]);
+
+  const handleReindex = async (sourceId: string) => {
+    if (!currentProject) return;
+    setReindexingId(sourceId);
+    try {
+      await api.ingestion.reindexSource(currentProject.id, sourceId);
+      showToast("Re-indexing started for document", "info");
+      setTimeout(() => loadData(), 1200);
+    } catch (err: any) {
+      showToast(err.message || "Failed to reindex document", "error");
+    } finally {
+      setReindexingId(null);
+    }
+  };
+
+  const renderIndexingBadge = (source?: any) => {
+    if (!source) {
+      return (
+        <Badge variant="outline" className="text-[10px] text-zinc-500 border-zinc-800 bg-zinc-900/50">
+          Unindexed
+        </Badge>
+      );
+    }
+    if (source.status === "INDEXED") {
+      return (
+        <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/30 text-[10px] gap-1 flex items-center font-normal">
+          <Sparkles className="w-3 h-3" />
+          <span>Indexed ({source.chunkCount ?? 0} chunks)</span>
+        </Badge>
+      );
+    }
+    if (source.status === "PROCESSING") {
+      return (
+        <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px] gap-1 flex items-center font-normal">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          <span>Vectorizing...</span>
+        </Badge>
+      );
+    }
+    if (source.status === "FAILED") {
+      return (
+        <Badge className="bg-rose-500/15 text-rose-400 border-rose-500/30 text-[10px] gap-1 flex items-center font-normal" title={source.lastError || "Indexing failed"}>
+          <AlertCircle className="w-3 h-3" />
+          <span>Indexing Failed</span>
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="text-[10px] text-zinc-400 border-white/10 font-normal">
+        Queued
+      </Badge>
+    );
   };
 
   const filteredDocs = useMemo(() => {
@@ -259,6 +327,8 @@ export default function DocumentsPage() {
           <div className="space-y-3">
             {filteredDocs.map((doc) => {
               const isDownloading = downloadingId === doc.id;
+              const source = sourceMap.get(doc.id);
+              const isReindexing = source && reindexingId === source.id;
               return (
                 <Card
                   key={doc.id}
@@ -275,6 +345,7 @@ export default function DocumentsPage() {
                             {doc.title || doc.originalFilename}
                           </span>
                           {getFileBadge(doc.originalFilename || "", doc.mimeType || "")}
+                          {renderIndexingBadge(source)}
                         </div>
                         <div className="flex items-center gap-3 text-[11px] text-zinc-500 font-mono flex-wrap">
                           <span>{doc.originalFilename}</span>
@@ -299,16 +370,31 @@ export default function DocumentsPage() {
                       </div>
                     </div>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDownload(doc)}
-                      disabled={isDownloading}
-                      className="h-8 text-xs border-white/10 hover:border-amber-500/40 hover:text-amber-300 gap-1.5 self-start sm:self-auto shrink-0"
-                    >
-                      {isDownloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                      <span>{isDownloading ? "Downloading..." : "Download"}</span>
-                    </Button>
+                    <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                      {source && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleReindex(source.id)}
+                          disabled={isReindexing || source.status === "PROCESSING"}
+                          title="Trigger full semantic vector reindexing"
+                          className="h-8 text-xs border border-white/5 hover:border-white/20 text-zinc-400 hover:text-white gap-1.5"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${isReindexing ? "animate-spin" : ""}`} />
+                          <span className="hidden md:inline">Reindex</span>
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownload(doc)}
+                        disabled={isDownloading}
+                        className="h-8 text-xs border-white/10 hover:border-amber-500/40 hover:text-amber-300 gap-1.5"
+                      >
+                        {isDownloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                        <span>{isDownloading ? "Downloading..." : "Download"}</span>
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               );

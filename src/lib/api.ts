@@ -300,4 +300,26 @@ export const api = {
     delete: async (projectId: string, docId: string) =>
       apiRequestRaw(`/projects/${projectId}/documents/${docId}`, { method: "DELETE" }),
   },
+
+  ingestion: {
+    listSources: async (
+      projectId: string,
+      params?: { sourceType?: string; status?: string; search?: string }
+    ) => {
+      const q = new URLSearchParams();
+      if (params?.sourceType) q.append("sourceType", params.sourceType);
+      if (params?.status) q.append("status", params.status);
+      if (params?.search) q.append("search", params.search);
+      const qs = q.toString() ? `?${q.toString()}` : "";
+      return apiRequest<any[]>(`/projects/${projectId}/ingestion/sources${qs}`);
+    },
+    getSource: async (projectId: string, sourceId: string) =>
+      apiRequest<any>(`/projects/${projectId}/ingestion/sources/${sourceId}`),
+    reindexSource: async (projectId: string, sourceId: string) =>
+      apiRequest<any>(`/projects/${projectId}/ingestion/sources/${sourceId}/reindex`, {
+        method: "POST",
+      }),
+    listJobs: async (projectId: string) =>
+      apiRequest<any[]>(`/projects/${projectId}/ingestion/jobs`),
+  },
 };
