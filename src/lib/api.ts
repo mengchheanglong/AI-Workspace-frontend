@@ -322,4 +322,37 @@ export const api = {
     listJobs: async (projectId: string) =>
       apiRequest<any[]>(`/projects/${projectId}/ingestion/jobs`),
   },
+
+  ai: {
+    listConversations: async (projectId: string) =>
+      apiRequest<any[]>(`/projects/${projectId}/ai/conversations`),
+    createConversation: async (
+      projectId: string,
+      data?: { title?: string; defaultMode?: string }
+    ) =>
+      apiRequest<any>(`/projects/${projectId}/ai/conversations`, {
+        method: "POST",
+        body: JSON.stringify(data || {}),
+      }),
+    getConversation: async (projectId: string, conversationId: string) =>
+      apiRequest<any>(`/projects/${projectId}/ai/conversations/${conversationId}`),
+    deleteConversation: async (projectId: string, conversationId: string) =>
+      apiRequestRaw(`/projects/${projectId}/ai/conversations/${conversationId}`, {
+        method: "DELETE",
+      }),
+    listMessages: async (projectId: string, conversationId: string) =>
+      apiRequest<any[]>(`/projects/${projectId}/ai/conversations/${conversationId}/messages`),
+    postMessage: async (
+      projectId: string,
+      conversationId: string,
+      data: { content: string; mode?: string; sourceType?: string }
+    ) =>
+      apiRequest<{ userMessage: any; assistantMessage: any }>(
+        `/projects/${projectId}/ai/conversations/${conversationId}/messages`,
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+        }
+      ),
+  },
 };
