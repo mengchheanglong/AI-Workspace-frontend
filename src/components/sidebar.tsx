@@ -13,10 +13,12 @@ import {
   FileText,
   Search,
   FolderOpen,
+  Sparkles,
 } from "lucide-react";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "AI Assistant", href: "/assistant", icon: Sparkles },
   { label: "Requirements", href: "/requirements", icon: FileCheck2 },
   { label: "Decisions", href: "/decisions", icon: GitPullRequest },
   { label: "Tasks", href: "/tasks", icon: CheckSquare },

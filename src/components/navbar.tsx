@@ -68,20 +68,33 @@ export const Navbar: React.FC = () => {
         {/* Quick Actions & Profile */}
         <div className="flex items-center gap-2.5">
           {user && (
-            <Link href="/search">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 gap-2 text-xs text-zinc-400 bg-white/[0.02] border-white/10 hover:border-indigo-500/40 hover:text-zinc-200 transition-all"
-                title="Search Workspace (Ctrl+K)"
-              >
-                <Search className="w-3.5 h-3.5 text-zinc-400" />
-                <span className="hidden md:inline">Quick Search...</span>
-                <kbd className="hidden md:inline-flex items-center gap-0.5 text-[10px] font-mono bg-white/10 px-1.5 py-0.5 rounded text-zinc-400">
-                  <Command className="w-2.5 h-2.5" /> K
-                </kbd>
-              </Button>
-            </Link>
+            <>
+              <Link href="/assistant">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-2 text-xs text-indigo-300 bg-indigo-950/30 border-indigo-500/30 hover:bg-indigo-900/40 hover:border-indigo-400/50 hover:text-indigo-200 transition-all shadow-sm"
+                  title="AI Workspace Assistant"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                  <span className="hidden sm:inline">AI Copilot</span>
+                </Button>
+              </Link>
+              <Link href="/search">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-2 text-xs text-zinc-400 bg-white/[0.02] border-white/10 hover:border-indigo-500/40 hover:text-zinc-200 transition-all"
+                  title="Search Workspace (Ctrl+K)"
+                >
+                  <Search className="w-3.5 h-3.5 text-zinc-400" />
+                  <span className="hidden md:inline">Quick Search...</span>
+                  <kbd className="hidden md:inline-flex items-center gap-0.5 text-[10px] font-mono bg-white/10 px-1.5 py-0.5 rounded text-zinc-400">
+                    <Command className="w-2.5 h-2.5" /> K
+                  </kbd>
+                </Button>
+              </Link>
+            </>
           )}
 
           {user ? (
