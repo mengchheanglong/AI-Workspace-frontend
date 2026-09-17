@@ -14,6 +14,7 @@ import {
   Search,
   FolderOpen,
   Sparkles,
+  Layers,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { label: "Tasks", href: "/tasks", icon: CheckSquare },
   { label: "Meetings", href: "/meetings", icon: Calendar },
   { label: "Documents", href: "/documents", icon: FileText },
+  { label: "Integrations", href: "/integrations", icon: Layers },
   { label: "Search", href: "/search", icon: Search },
   { label: "Projects", href: "/projects", icon: FolderOpen },
 ];
