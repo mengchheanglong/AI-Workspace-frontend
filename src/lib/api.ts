@@ -406,4 +406,44 @@ export const api = {
       );
     },
   },
+  integrations: {
+    github: {
+      getConnection: async (projectId: string) =>
+        apiRequest<any>(`/projects/${projectId}/integrations/github`),
+      connect: async (
+        projectId: string,
+        data: { repositoryOwner: string; repositoryName: string; accessToken?: string }
+      ) =>
+        apiRequest<any>(`/projects/${projectId}/integrations/github/connect`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      sync: async (projectId: string, accessToken?: string) =>
+        apiRequest<{ syncedCount: number; totalCount: number; lastSyncedAt: string }>(
+          `/projects/${projectId}/integrations/github/sync`,
+          {
+            method: "POST",
+            body: JSON.stringify({ accessToken }),
+          }
+        ),
+      disconnect: async (projectId: string) =>
+        apiRequest<void>(`/projects/${projectId}/integrations/github`, {
+          method: "DELETE",
+        }),
+      listIssues: async (
+        projectId: string,
+        params?: { state?: string; q?: string; page?: number; limit?: number }
+      ) => {
+        const q = new URLSearchParams();
+        if (params?.state) q.append("state", params.state);
+        if (params?.q) q.append("q", params.q);
+        if (params?.page) q.append("page", String(params.page));
+        if (params?.limit) q.append("limit", String(params.limit));
+        const qs = q.toString() ? `?${q.toString()}` : "";
+        return apiRequest<{ items: any[]; total: number; page: number; limit: number }>(
+          `/projects/${projectId}/integrations/github/issues${qs}`
+        );
+      },
+    },
+  },
 };
