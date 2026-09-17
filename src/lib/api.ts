@@ -354,5 +354,56 @@ export const api = {
           body: JSON.stringify(data),
         }
       ),
+    generateTaskProposal: async (projectId: string, requirementId: string) =>
+      apiRequest<any>(`/projects/${projectId}/ai/requirements/${requirementId}/task-proposals`, {
+        method: "POST",
+      }),
+    generateMeetingAnalysis: async (projectId: string, meetingId: string) =>
+      apiRequest<any>(`/projects/${projectId}/ai/meetings/${meetingId}/analysis-proposals`, {
+        method: "POST",
+      }),
+    listProposals: async (projectId: string, params?: { status?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.status) q.append("status", params.status);
+      const qs = q.toString() ? `?${q.toString()}` : "";
+      return apiRequest<any[]>(`/projects/${projectId}/ai/proposals${qs}`);
+    },
+    getProposal: async (projectId: string, proposalId: string) =>
+      apiRequest<any>(`/projects/${projectId}/ai/proposals/${proposalId}`),
+    updateProposal: async (
+      projectId: string,
+      proposalId: string,
+      data: { version: number; draftJson: any }
+    ) =>
+      apiRequest<any>(`/projects/${projectId}/ai/proposals/${proposalId}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    rejectProposal: async (projectId: string, proposalId: string) =>
+      apiRequest<any>(`/projects/${projectId}/ai/proposals/${proposalId}/reject`, {
+        method: "POST",
+      }),
+    confirmProposal: async (
+      projectId: string,
+      proposalId: string,
+      data: { version: number; selectedItemIds?: string[]; includeSummary?: boolean },
+      idempotencyKey?: string
+    ) => {
+      const headers: Record<string, string> = {
+        "Idempotency-Key":
+          idempotencyKey ||
+          (typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `idem-${Date.now()}`),
+      };
+      return apiRequest<{ proposal: any; resultRecordIds: any[] }>(
+        `/projects/${projectId}/ai/proposals/${proposalId}/confirm`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(data),
+        }
+      );
+    },
   },
 };

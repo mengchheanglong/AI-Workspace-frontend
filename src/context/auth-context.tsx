@@ -91,6 +91,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function init() {
       try {
+        // Always refresh CSRF token first so POST requests work after page reload
+        await api.auth.csrf();
         const me = await api.auth.me();
         setUser(me);
         await refreshProjects();
