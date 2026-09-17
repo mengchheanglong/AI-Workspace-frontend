@@ -5,6 +5,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/context/toast-context";
 import { AppLayout } from "@/components/app-layout";
+import { ProposalReviewDialog } from "@/components/ai/proposal-review-dialog";
 import { api } from "@/lib/api";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,28 @@ export default function MeetingsPage() {
   const [transcriptText, setTranscriptText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // AI Proposal state
+  const [activeProposal, setActiveProposal] = useState<any>(null);
+  const [generatingProposalId, setGeneratingProposalId] = useState<string | null>(null);
+
+  const handleGenerateAnalysis = async (meeting: any) => {
+    if (!currentProject) return;
+    if (!meeting.transcriptText && !meeting.notes) {
+      showToast("Meeting must have notes or a transcript for AI analysis.", "error");
+      return;
+    }
+    setGeneratingProposalId(meeting.id);
+    try {
+      const res = await api.ai.generateMeetingAnalysis(currentProject.id, meeting.id);
+      setActiveProposal(res.proposal || res);
+      showToast("Generated meeting analysis! Review proposals before applying.", "info");
+    } catch (err: any) {
+      showToast(err.message || "Failed to generate meeting analysis", "error");
+    } finally {
+      setGeneratingProposalId(null);
+    }
+  };
 
   const loadData = async () => {
     if (!currentProject) return;
@@ -336,15 +359,28 @@ export default function MeetingsPage() {
                         )}
                       </div>
 
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setExpandedMeetingId(isExpanded ? null : meeting.id)}
-                        className="h-7 text-[11px] text-zinc-400 hover:text-white self-start sm:self-auto gap-1"
-                      >
-                        <span>{isExpanded ? "Hide Details" : "View Notes & Transcript"}</span>
-                        {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                      </Button>
+                      <div className="flex items-center gap-2 self-start sm:self-auto">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={generatingProposalId === meeting.id}
+                          onClick={() => handleGenerateAnalysis(meeting)}
+                          className="h-7 text-[11px] border-blue-500/30 bg-blue-600/10 hover:bg-blue-600/20 text-blue-300 gap-1 px-2.5"
+                        >
+                          <Sparkles className={`w-3 h-3 ${generatingProposalId === meeting.id ? "animate-spin" : "text-blue-400"}`} />
+                          <span>{generatingProposalId === meeting.id ? "Analyzing..." : "AI Analysis"}</span>
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setExpandedMeetingId(isExpanded ? null : meeting.id)}
+                          className="h-7 text-[11px] text-zinc-400 hover:text-white gap-1"
+                        >
+                          <span>{isExpanded ? "Hide Details" : "View Notes & Transcript"}</span>
+                          {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </Button>
+                      </div>
                     </div>
 
                     <CardTitle className="text-sm font-semibold text-white pt-2 leading-snug">
@@ -385,6 +421,24 @@ export default function MeetingsPage() {
         )}
 
       </div>
+
+      {activeProposal && currentProject && (
+        <ProposalReviewDialog
+          isOpen={!!activeProposal}
+          onClose={() => setActiveProposal(null)}
+          proposal={activeProposal}
+          projectId={currentProject.id}
+          onConfirmed={(resultRecordIds) => {
+            showToast(`Created ${resultRecordIds.length} records from meeting analysis!`, "success");
+            setActiveProposal(null);
+            loadData();
+          }}
+          onRejected={() => {
+            showToast("Meeting analysis discarded", "info");
+            setActiveProposal(null);
+          }}
+        />
+      )}
     </AppLayout>
   );
 }

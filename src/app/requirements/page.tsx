@@ -5,6 +5,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/context/toast-context";
 import { AppLayout } from "@/components/app-layout";
+import { ProposalReviewDialog } from "@/components/ai/proposal-review-dialog";
 import { api } from "@/lib/api";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,24 @@ export default function RequirementsPage() {
   const [priority, setPriority] = useState<"LOW" | "MEDIUM" | "HIGH" | "URGENT">("HIGH");
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // AI Proposal state
+  const [activeProposal, setActiveProposal] = useState<any>(null);
+  const [generatingProposalId, setGeneratingProposalId] = useState<string | null>(null);
+
+  const handleGenerateTasks = async (req: any) => {
+    if (!currentProject) return;
+    setGeneratingProposalId(req.id);
+    try {
+      const res = await api.ai.generateTaskProposal(currentProject.id, req.id);
+      setActiveProposal(res.proposal || res);
+      showToast("Generated task proposal! Review before applying.", "info");
+    } catch (err: any) {
+      showToast(err.message || "Failed to generate tasks", "error");
+    } finally {
+      setGeneratingProposalId(null);
+    }
+  };
 
   const loadData = async () => {
     if (!currentProject) return;
@@ -401,8 +420,19 @@ export default function RequirementsPage() {
                         <span className="text-[10px] text-zinc-500 font-mono">Rev: v{req.version}</span>
                       </div>
 
-                      {/* Status changer dropdown */}
-                      <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                      {/* Actions: AI Generate Tasks & Status dropdown */}
+                      <div className="flex items-center gap-2 self-start sm:self-auto">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={generatingProposalId === req.id}
+                          onClick={() => handleGenerateTasks(req)}
+                          className="h-6 text-[11px] border-indigo-500/30 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-300 gap-1 px-2"
+                        >
+                          <Sparkles className={`w-3 h-3 ${generatingProposalId === req.id ? "animate-spin" : "text-indigo-400"}`} />
+                          <span>{generatingProposalId === req.id ? "Generating..." : "Generate Tasks"}</span>
+                        </Button>
+
                         <span className="text-[10px] text-zinc-500 font-medium">Status:</span>
                         <select
                           value={req.status}
@@ -467,6 +497,23 @@ export default function RequirementsPage() {
         )}
 
       </div>
+
+      {activeProposal && currentProject && (
+        <ProposalReviewDialog
+          isOpen={!!activeProposal}
+          onClose={() => setActiveProposal(null)}
+          proposal={activeProposal}
+          projectId={currentProject.id}
+          onConfirmed={(resultRecordIds) => {
+            showToast(`Created ${resultRecordIds.length} tasks successfully!`, "success");
+            setActiveProposal(null);
+          }}
+          onRejected={() => {
+            showToast("Proposal discarded", "info");
+            setActiveProposal(null);
+          }}
+        />
+      )}
     </AppLayout>
   );
 }
