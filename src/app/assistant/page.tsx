@@ -82,6 +82,8 @@ interface CitationItem {
   locator?: string | null;
   score?: number;
   snippet?: string;
+  projectName?: string;
+  projectKey?: string;
 }
 
 interface ChatMessage {
@@ -142,6 +144,13 @@ const PROMPT_SUGGESTIONS = [
   { mode: "QA", icon: TestTube, title: "Plan test coverage", desc: "Find acceptance criteria and gaps to verify.", prompt: "Help me plan test coverage based on the project requirements. Cite the acceptance criteria and identify any gaps." },
 ];
 
+const ALL_PROJECTS_PROMPT_SUGGESTIONS = [
+  { mode: "PM", icon: Zap, title: "Compare workspace progress", desc: "Compare status, milestones, and blockers across all projects.", prompt: "Compare the progress, priorities, and active blockers across all workspaces. Cite the records from each project." },
+  { mode: "DEVELOPER", icon: FileCheck2, title: "Cross-project architecture", desc: "Review shared requirements, technologies, and designs.", prompt: "Analyze the architecture, tech stacks, and specifications across all workspaces. Which requirements or patterns are shared between them?" },
+  { mode: "DEVELOPER", icon: GitPullRequest, title: "Cross-workspace decisions", desc: "Synthesize key architectural decisions across projects.", prompt: "Summarize the key architectural and technical decisions made across all workspaces, noting how each project approaches its core problems." },
+  { mode: "QA", icon: TestTube, title: "Quality & risk overview", desc: "Identify testing gaps and delivery risks across workspaces.", prompt: "Audit the test coverage, quality status, and delivery risks across all workspaces. Highlight which projects need QA attention." },
+];
+
 function getModeConfig(key: string) {
   return MODES.find((m) => m.key === key) ?? MODES[0]!;
 }
@@ -165,7 +174,6 @@ export default function AssistantPage() {
   const { currentProject, user, projects, setCurrentProject } = useAuth();
   const { showToast } = useToast();
 
-  const [selectedChatProjectId, setSelectedChatProjectId] = useState<string>("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConv, setActiveConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -188,13 +196,6 @@ export default function AssistantPage() {
   const draftsRef = useRef<Record<string, string>>({});
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
-
-  // Default selectedChatProjectId when projects load
-  useEffect(() => {
-    if (projects.length > 0 && (!selectedChatProjectId || !projects.some((p) => p.id === selectedChatProjectId))) {
-      setSelectedChatProjectId(projects[0]!.id);
-    }
-  }, [projects, selectedChatProjectId]);
 
   // Search in conversation history
   const [convSearch, setConvSearch] = useState<string>("");
@@ -220,7 +221,10 @@ export default function AssistantPage() {
 
   // Fetch complete entity records when inspecting citation in-app
   useEffect(() => {
-    const targetProjId = activeConv?.projectId || currentProject?.id || selectedChatProjectId || projects[0]?.id;
+    const matchedProj = projects.find(
+      (p) => p.key === inspectingCitation?.projectKey || p.name === inspectingCitation?.projectName
+    );
+    const targetProjId = matchedProj?.id || activeConv?.projectId || currentProject?.id || projects[0]?.id;
     if (!inspectingCitation || !targetProjId) {
       setInspectingDetails(null);
       return;
@@ -269,7 +273,7 @@ export default function AssistantPage() {
     return () => {
       isCancelled = true;
     };
-  }, [inspectingCitation, activeConv?.projectId, currentProject?.id, selectedChatProjectId, projects]);
+  }, [inspectingCitation, activeConv?.projectId, currentProject?.id, projects]);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messageScrollRef = useRef<HTMLDivElement>(null);
@@ -353,7 +357,7 @@ export default function AssistantPage() {
   }, [currentProject, projects]);
 
   const loadMessages = useCallback(async (convId: string, convProjectId?: string) => {
-    const targetProjId = convProjectId || activeConv?.projectId || currentProject?.id || selectedChatProjectId || projects[0]?.id;
+    const targetProjId = convProjectId || activeConv?.projectId || currentProject?.id || projects[0]?.id;
     if (!targetProjId) return;
     const request = ++messageLoadRef.current;
     setMessages([]);
@@ -377,7 +381,7 @@ export default function AssistantPage() {
     } finally {
       if (request === messageLoadRef.current) setIsLoadingMessages(false);
     }
-  }, [activeConv?.projectId, currentProject?.id, selectedChatProjectId, projects]);
+  }, [activeConv?.projectId, currentProject?.id, projects]);
 
   useEffect(() => {
     setConversations([]);
@@ -479,7 +483,7 @@ export default function AssistantPage() {
     async (textToSend?: string) => {
       const text = (textToSend !== undefined ? textToSend : inputContent).trim();
       const targetProjectId =
-        activeConv?.projectId || currentProject?.id || selectedChatProjectId || projects[0]?.id;
+        activeConv?.projectId || currentProject?.id || projects[0]?.id;
       if (!text || sendInFlightRef.current || isLoadingMessages || !targetProjectId) return;
       sendInFlightRef.current = true;
       messageLoadRef.current++;
@@ -546,6 +550,7 @@ export default function AssistantPage() {
         const res = await api.ai.postMessage(postProjId, conv.id, {
           content: text,
           mode: selectedMode,
+          includeAllWorkspaces: !currentProject,
         });
 
         const { userMessage, assistantMessage } = res;
@@ -573,7 +578,7 @@ export default function AssistantPage() {
         setIsSending(false);
       }
     },
-    [activeConv, currentProject?.id, selectedChatProjectId, projects, inputContent, isLoadingMessages, selectedMode]
+    [activeConv, currentProject, projects, inputContent, isLoadingMessages, selectedMode]
   );
 
   const filteredConversations = useMemo(() => {
@@ -755,29 +760,19 @@ export default function AssistantPage() {
                     </h2>
                     <p className="mt-2 max-w-lg text-sm leading-relaxed text-slate-500">
                       {!currentProject
-                        ? "Chat across your project workspaces, verify requirements, and plan your next steps."
+                        ? "Chat across all your project workspaces with shared context, verify requirements, and compare progress."
                         : "Explore your project’s knowledge, clarify requirements, and plan your next step with sources you can review."}
                     </p>
                   </div>
                   {!currentProject && projects.length > 0 && (
-                    <div className="shrink-0 flex items-center gap-2 p-1.5 rounded-xl bg-slate-50 border border-slate-200">
-                      <span className="text-[11px] text-slate-500 font-medium pl-1">Target workspace:</span>
-                      <select
-                        value={selectedChatProjectId || projects[0]?.id}
-                        onChange={(e) => setSelectedChatProjectId(e.target.value)}
-                        className="text-xs font-semibold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-800 outline-none focus:ring-1 focus:ring-codex-accent cursor-pointer"
-                      >
-                        {projects.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            [{p.key}] {p.name}
-                          </option>
-                        ))}
-                      </select>
+                    <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-50 border border-indigo-200/80 text-codex-accent text-xs font-medium">
+                      <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>Shared cross-workspace context active ({projects.length} workspaces)</span>
                     </div>
                   )}
                 </div>
                 <div className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {PROMPT_SUGGESTIONS.map((suggestion) => (
+                  {(!currentProject ? ALL_PROJECTS_PROMPT_SUGGESTIONS : PROMPT_SUGGESTIONS).map((suggestion) => (
                     <button
                       key={suggestion.title}
                       type="button"
@@ -897,6 +892,11 @@ export default function AssistantPage() {
                                     <div className="flex items-center gap-1 pr-2">
                                       <button type="button" aria-expanded={expanded} aria-label={`${expanded ? "Hide" : "Show"} evidence from ${citation.title}`} onClick={() => setExpandedCitation(expanded ? null : citationKey)} className="flex min-w-0 flex-1 items-center gap-2 px-3 py-3 text-left text-xs text-slate-600 hover:bg-slate-100">
                                         <span className="shrink-0 font-mono text-[10px] text-slate-400">[{citation.evidenceNumber ?? index + 1}]</span>
+                                        {citation.projectKey && (
+                                          <span className="shrink-0 rounded bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 text-[9px] font-bold text-indigo-700">
+                                            {citation.projectKey}
+                                          </span>
+                                        )}
                                         <Icon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                                         <span className="truncate font-medium">{citation.title}</span>
                                         <ChevronDown className={`ml-auto h-3 w-3 shrink-0 text-slate-400 ${expanded ? "rotate-180" : ""}`} />
@@ -1001,6 +1001,11 @@ export default function AssistantPage() {
                 </div>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
+                    {inspectingCitation.projectKey && (
+                      <span className="font-bold text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-indigo-100/90 text-indigo-800 border border-indigo-200">
+                        [{inspectingCitation.projectKey}] {inspectingCitation.projectName || ""}
+                      </span>
+                    )}
                     {inspectingDetails?.displayKey ? (
                       <span className="font-bold text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100/90 text-blue-800 border border-blue-200">
                         {inspectingDetails.displayKey}

@@ -597,7 +597,7 @@ export const api = {
     postMessage: async (
       projectId: string,
       conversationId: string,
-      data: { content: string; mode?: string; sourceType?: string }
+      data: { content: string; mode?: string; sourceType?: string; includeAllWorkspaces?: boolean }
     ) =>
       apiRequest<{ userMessage: any; assistantMessage: any }>(
         `/projects/${projectId}/ai/conversations/${conversationId}/messages`,
